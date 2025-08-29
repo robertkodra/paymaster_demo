@@ -1,0 +1,21 @@
+{
+  "name": "ready-wallet-paymaster-demo",
+  "version": "1.0.0",
+  "description": "StarkNet wallet creation demo using AVNU paymaster",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["starknet", "paymaster", "wallet", "avnu"],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@avnu/gasless-sdk": "^0.1.8",
+    "dotenv": "^17.2.1",
+    "ethers": "^6.15.0",
+    "express": "^5.1.0",
+    "starknet": "^7.6.4"
+  }
+}
