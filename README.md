@@ -10,7 +10,7 @@ This repository contains a minimal full‑stack demo for creating and deploying 
 ```
 paymaster_demo/
 ├─ api/                # Express backend (starknet.js)
-│  ├─ server.js        # App entry
+│  ├─ server.ts        # App entry
 │  ├─ src/             # Routes, libs, middleware
 │  └─ .env.example     # API env template
 └─ client/             # Next.js frontend (Privy auth)
@@ -27,25 +27,34 @@ paymaster_demo/
 ## Setup
 
 Backend (API):
-1) cd api && npm install
-2) cp .env.example .env (or .env.local) and set:
+
+1. cd api && npm install
+2. cp .env.example .env (or .env.local) and set:
    - PORT, CLIENT_URL
    - RPC_URL
    - READY_CLASSHASH
    - PRIVY_APP_ID, PRIVY_APP_SECRET
    - (optional) PRIVY_WALLET_AUTH_PRIVATE_KEY
-3) npm run dev
+3. npm run dev
+
+Environment loading for API:
+
+- The server loads env in this order (first match wins):
+  - api/.env.local, api/.env, repo-root/.env.local, repo-root/.env
+  - In production, prefer real environment variables over files.
 
 Frontend (client):
-1) cd client && npm install
-2) cp .env.example .env.local and set:
+
+1. cd client && npm install
+2. cp .env.example .env.local and set:
    - NEXT_PUBLIC_PRIVY_APP_ID
    - NEXT_PUBLIC_API_URL
-3) npm run dev
+3. npm run dev
 
 Access:
+
 - Frontend: http://localhost:3001
-- Backend:  http://localhost:3000
+- Backend: http://localhost:3000
 
 ## Notes
 

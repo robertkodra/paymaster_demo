@@ -1,7 +1,8 @@
-const express = require('express');
-const router = express.Router();
+import { Router, Request, Response } from 'express'
 
-router.get('/', (req, res) => {
+const router = Router()
+
+router.get('/', (_req: Request, res: Response) => {
   res.json({
     status: 'Ready Wallet API running',
     version: '2.0.0',
@@ -10,8 +11,8 @@ router.get('/', (req, res) => {
       privyDeploy: 'POST /privy/deploy-wallet',
       paymasterCreate: 'POST /create-wallet',
     },
-  });
-});
+  })
+})
 
-module.exports = router;
+export default router
 

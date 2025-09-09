@@ -26,10 +26,8 @@ Before creating an issue, please check if it already exists. When creating a new
    - Update documentation as needed
 
 3. **Test your changes**
-   ```bash
-   npm install
-   npm start
-   ```
+   - API: `cd api && npm install && npm run dev` (TypeScript via tsx watch)
+   - Client: `cd client && npm install && npm run dev`
 
 4. **Commit your changes**
    - Use clear and meaningful commit messages
@@ -49,12 +47,9 @@ Before creating an issue, please check if it already exists. When creating a new
 
 ### Code Standards
 
-- Use ES6+ JavaScript features
-- Follow existing code formatting
-- Add JSDoc comments for functions
-- Handle errors appropriately
-- Keep functions small and focused
-- Write self-documenting code
+- API uses TypeScript. New files under `api/src/**` should be `.ts`.
+- Follow existing formatting; keep functions small and focused.
+- Handle errors with clear messages returned to the client.
 
 ### Security
 
@@ -65,9 +60,13 @@ Before creating an issue, please check if it already exists. When creating a new
 ### Development Setup
 
 1. Clone the repository
-2. Install dependencies: `npm install`
-3. Copy `.env.sample` to `.env` and configure
-4. Run the development server: `npm run dev`
+2. Install dependencies in each app: `cd api && npm install && cd ../client && npm install`
+3. Configure env files
+   - API: copy `api/.env.example` to `api/.env.local` (or `.env`) and fill values
+   - Client: copy `client/.env.example` to `client/.env.local` and fill values
+4. Run the apps
+   - API: `cd api && npm run dev`
+   - Client: `cd client && npm run dev`
 
 ### Testing
 
