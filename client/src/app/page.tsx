@@ -1,176 +1,225 @@
-'use client'
+"use client";
 
-import { usePrivy } from '@privy-io/react-auth'
-import LoginButton from '@/components/LoginButton'
-import { useEffect, useState } from 'react'
+import { usePrivy } from "@privy-io/react-auth";
+import LoginButton from "@/components/LoginButton";
+import { useEffect, useState } from "react";
 
 export default function Home() {
-  const { ready, authenticated, user, getAccessToken, logout } = usePrivy() as any
-  const [creating, setCreating] = useState(false)
-  const [deploying, setDeploying] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  
-  const [walletId, setWalletId] = useState<string | null>(null)
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [publicKey, setPublicKey] = useState<string | null>(null)
-  const [txHash, setTxHash] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [wallets, setWallets] = useState<Array<{id:string; address:string; publicKey?:string}> | null>(null)
+  const { ready, authenticated, user, getAccessToken, logout } =
+    usePrivy() as any;
+  const [creating, setCreating] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const hasExistingStarknetWallet = !!(wallets && wallets.length > 0)
-  const hasWallet = !!(walletId || walletAddress || publicKey)
-  const baseApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+  const [walletId, setWalletId] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [wallets, setWallets] = useState<Array<{
+    id: string;
+    address: string;
+    publicKey?: string;
+  }> | null>(null);
 
-  const formatStarknetAddress = (addr: string | null | undefined): string | null => {
-    if (!addr) return null
-    let s = addr.toLowerCase()
-    if (!s.startsWith('0x')) s = '0x' + s
-    const body = s.slice(2)
-    const padded = body.padStart(64, '0')
-    return '0x' + padded
-  }
+  const hasExistingStarknetWallet = !!(wallets && wallets.length > 0);
+  const hasWallet = !!(walletId || walletAddress || publicKey);
+  const baseApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+  const formatStarknetAddress = (
+    addr: string | null | undefined
+  ): string | null => {
+    if (!addr) return null;
+    let s = addr.toLowerCase();
+    if (!s.startsWith("0x")) s = "0x" + s;
+    const body = s.slice(2);
+    const padded = body.padStart(64, "0");
+    return "0x" + padded;
+  };
 
   // Load previously selected wallet from localStorage on mount
   useEffect(() => {
     try {
-      const lsId = window.localStorage.getItem('starknet_wallet_id')
-      const lsAddr = window.localStorage.getItem('starknet_wallet_address')
-      const lsPk = window.localStorage.getItem('starknet_public_key')
-      if (lsId) setWalletId(lsId)
-      if (lsAddr) setWalletAddress(lsAddr)
-      if (lsPk) setPublicKey(lsPk)
+      const lsId = window.localStorage.getItem("starknet_wallet_id");
+      const lsAddr = window.localStorage.getItem("starknet_wallet_address");
+      const lsPk = window.localStorage.getItem("starknet_public_key");
+      if (lsId) setWalletId(lsId);
+      if (lsAddr) setWalletAddress(lsAddr);
+      if (lsPk) setPublicKey(lsPk);
     } catch {}
-  }, [])
+  }, []);
 
   // Persist to localStorage when values change
   useEffect(() => {
     try {
-      if (walletId) window.localStorage.setItem('starknet_wallet_id', walletId)
+      if (walletId) window.localStorage.setItem("starknet_wallet_id", walletId);
     } catch {}
-  }, [walletId])
+  }, [walletId]);
   useEffect(() => {
     try {
-      if (walletAddress) window.localStorage.setItem('starknet_wallet_address', walletAddress)
+      if (walletAddress)
+        window.localStorage.setItem("starknet_wallet_address", walletAddress);
     } catch {}
-  }, [walletAddress])
+  }, [walletAddress]);
   useEffect(() => {
     try {
-      if (publicKey) window.localStorage.setItem('starknet_public_key', publicKey)
+      if (publicKey)
+        window.localStorage.setItem("starknet_public_key", publicKey);
     } catch {}
-  }, [publicKey])
+  }, [publicKey]);
 
   const fetchWallets = async () => {
     try {
-      if (!ready || !authenticated || !user?.id) return
+      if (!ready || !authenticated || !user?.id) return;
       // If values already exist (from localStorage or previous fetch), don't overwrite them on refresh
-      if (walletId || walletAddress || publicKey) return
-      setError(null)
-      setRefreshing(true)
-      const resp = await fetch(`${baseApi}/privy/user-wallets?userId=${encodeURIComponent(user.id)}&t=${Date.now()}`)
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok) throw new Error(data?.error || 'Failed to fetch wallets')
-      const list = Array.isArray(data.wallets) ? data.wallets : []
-      setWallets(list)
+      if (walletId || walletAddress || publicKey) return;
+      setError(null);
+      setRefreshing(true);
+      const resp = await fetch(
+        `${baseApi}/privy/user-wallets?userId=${encodeURIComponent(
+          user.id
+        )}&t=${Date.now()}`
+      );
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || "Failed to fetch wallets");
+      const list = Array.isArray(data.wallets) ? data.wallets : [];
+      setWallets(list);
       if (list.length > 0) {
-        const w = list.find((v: any) => v?.publicKey) || list[0]
-        if (w.id) setWalletId(w.id)
-        if (w.address) setWalletAddress(formatStarknetAddress(w.address))
-        if (w.publicKey) setPublicKey(w.publicKey)
+        const w = list.find((v: any) => v?.publicKey) || list[0];
+        if (w.id) setWalletId(w.id);
+        if (w.address) setWalletAddress(formatStarknetAddress(w.address));
+        if (w.publicKey) setPublicKey(w.publicKey);
         // If public key is missing, fetch full wallet details
         if (!w.publicKey && w.id) {
           try {
             const resp2 = await fetch(`${baseApi}/privy/public-key`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ walletId: w.id })
-            })
-            const data2 = await resp2.json().catch(() => ({}))
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ walletId: w.id }),
+            });
+            const data2 = await resp2.json().catch(() => ({}));
             if (resp2.ok) {
-              const pk = data2.public_key || data2.wallet?.public_key || data2.wallet?.publicKey
-              const addr = data2.wallet?.address || w.address
-              if (pk) setPublicKey(pk)
-              if (addr) setWalletAddress(formatStarknetAddress(addr))
+              const pk =
+                data2.public_key ||
+                data2.wallet?.public_key ||
+                data2.wallet?.publicKey;
+              const addr = data2.wallet?.address || w.address;
+              if (pk) setPublicKey(pk);
+              if (addr) setWalletAddress(formatStarknetAddress(addr));
             }
           } catch {}
         }
       } // If no wallets, keep whatever is in localStorage/state
     } catch (e: any) {
-      setError(e.message || 'Failed to fetch wallets')
+      setError(e.message || "Failed to fetch wallets");
     } finally {
-      setRefreshing(false)
+      setRefreshing(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchWallets()
-  }, [ready, authenticated, user?.id])
+    fetchWallets();
+  }, [ready, authenticated, user?.id]);
 
   const createWallet = async () => {
     try {
-      setError(null)
-      setTxHash(null)
-      setCreating(true)
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/privy/create-wallet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerId: user?.id, chainType: 'starknet' })
-      })
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok) throw new Error(data?.error || 'Create wallet failed')
-      const w = data.wallet || {}
-      setWalletId(w.id || null)
-      setWalletAddress(formatStarknetAddress(w.address) || null)
-      setPublicKey(w.public_key || w.publicKey || null)
+      setError(null);
+      setTxHash(null);
+      setCreating(true);
+      const resp = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+        }/privy/create-wallet`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ownerId: user?.id, chainType: "starknet" }),
+        }
+      );
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || "Create wallet failed");
+      const w = data.wallet || {};
+      setWalletId(w.id || null);
+      setWalletAddress(formatStarknetAddress(w.address) || null);
+      setPublicKey(w.public_key || w.publicKey || null);
     } catch (e: any) {
-      setError(e.message || 'Create wallet failed')
+      setError(e.message || "Create wallet failed");
     } finally {
-      setCreating(false)
+      setCreating(false);
     }
-  }
+  };
 
   const deployWallet = async () => {
     try {
-      setError(null)
-      setTxHash(null)
-      setDeploying(true)
-      const id = walletId
+      setError(null);
+      setTxHash(null);
+      setDeploying(true);
+      const id = walletId;
       if (!id) {
-        setError('No walletId found. Create a wallet first.')
-        setDeploying(false)
-        return
+        setError("No walletId found. Create a wallet first.");
+        setDeploying(false);
+        return;
       }
-      let userJwt: string | undefined
+      let userJwt: string | undefined;
       try {
-        userJwt = typeof getAccessToken === 'function' ? await getAccessToken() : undefined
+        userJwt =
+          typeof getAccessToken === "function"
+            ? await getAccessToken()
+            : undefined;
       } catch {}
       if (!userJwt) {
-        setError('Unable to retrieve user session. Please re-login and try again.')
-        setDeploying(false)
-        return
+        setError(
+          "Unable to retrieve user session. Please re-login and try again."
+        );
+        setDeploying(false);
+        return;
       }
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/privy/deploy-wallet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletId: id, userJwt })
-      })
-      const data = await resp.json().catch(() => ({}))
-      if (!resp.ok) throw new Error(data?.error || 'Deploy failed')
-      setTxHash(data.transactionHash || null)
-      setWalletAddress(formatStarknetAddress(data.address) || walletAddress)
-      setPublicKey(data.publicKey || publicKey)
+      const resp = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+        }/privy/deploy-wallet`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userJwt}`,
+          },
+          body: JSON.stringify({ walletId: id }),
+        }
+      );
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || "Deploy failed");
+      setTxHash(data.transactionHash || null);
+      setWalletAddress(formatStarknetAddress(data.address) || walletAddress);
+      setPublicKey(data.publicKey || publicKey);
     } catch (e: any) {
-      setError(e.message || 'Deploy failed')
+      setError(e.message || "Deploy failed");
     } finally {
-      setDeploying(false)
+      setDeploying(false);
     }
-  }
+  };
+
+  // Temporary debug utility to clear local wallet state
+  const clearLocal = () => {
+    try {
+      window.localStorage.removeItem("starknet_wallet_id");
+      window.localStorage.removeItem("starknet_wallet_address");
+      window.localStorage.removeItem("starknet_public_key");
+    } catch {}
+    setWalletId(null);
+    setWalletAddress(null);
+    setPublicKey(null);
+    setTxHash(null);
+    setWallets(null);
+    setError(null);
+  };
 
   if (!ready) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="animate-pulse text-starknet-blue">Loading...</div>
       </div>
-    )
+    );
   }
 
   return (
@@ -182,14 +231,19 @@ export default function Home() {
               <span className="text-sm text-gray-700 truncate max-w-[280px]">
                 {user?.email?.address || user?.id}
               </span>
-              <button onClick={logout} className="btn-secondary">Logout</button>
+              <button onClick={logout} className="btn-secondary">
+                Logout
+              </button>
             </div>
           </div>
         )}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-starknet-blue mb-4">Privy Login</h1>
+          <h1 className="text-4xl font-bold text-starknet-blue mb-4">
+            Privy Login
+          </h1>
           <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Sign in with Privy. We will handle Starknet wallet creation and deployment on the backend.
+            Sign in with Privy. We will handle Starknet wallet creation and
+            deployment on the backend.
           </p>
         </div>
 
@@ -202,38 +256,84 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-6">
-              
               <div className="card text-center">
                 <h2 className="text-xl font-semibold mb-2">Welcome</h2>
-                <p className="text-gray-600 mb-1">{user?.email?.address || user?.id || 'Authenticated user'}</p>
-                <p className="text-gray-500 text-sm">Use the buttons below to create and deploy a Starknet wallet via the backend.</p>
+                <p className="text-gray-600 mb-1">
+                  {user?.email?.address || user?.id || "Authenticated user"}
+                </p>
+                <p className="text-gray-500 text-sm">
+                  Use the buttons below to create and deploy a Starknet wallet
+                  via the backend.
+                </p>
               </div>
               <div className="card">
                 <div className="flex flex-wrap gap-3">
-                  <button onClick={createWallet} className="btn-primary" disabled={creating || hasWallet} title={hasWallet ? 'Wallet already created' : undefined}>
-                    {creating ? 'Creating…' : hasWallet ? 'Wallet Exists' : 'Create Wallet'}
+                  <button
+                    onClick={createWallet}
+                    className="btn-primary"
+                    disabled={creating || hasWallet}
+                    title={hasWallet ? "Wallet already created" : undefined}
+                  >
+                    {creating
+                      ? "Creating…"
+                      : hasWallet
+                      ? "Wallet Exists"
+                      : "Create Wallet"}
                   </button>
-                  <button onClick={deployWallet} className="btn-secondary" disabled={deploying || !walletId}>
-                    {deploying ? 'Deploying…' : 'Deploy Wallet'}
+                  <button
+                    onClick={deployWallet}
+                    className="btn-secondary"
+                    disabled={deploying || !walletId}
+                  >
+                    {deploying ? "Deploying…" : "Deploy Wallet"}
                   </button>
-                  
-                  
+                  <button
+                    onClick={clearLocal}
+                    className="btn-secondary"
+                    title="Clear locally saved wallet (debug)"
+                  >
+                    Clear Local (Debug)
+                  </button>
                 </div>
                 <div className="mt-4 text-sm">
-                  <div><span className="font-medium">Wallet ID:</span> <span className="font-mono break-all">{walletId || '-'}</span></div>
-                  <div><span className="font-medium">Address:</span> <span className="font-mono break-all">{walletAddress ? formatStarknetAddress(walletAddress) : '-'}</span></div>
-                  <div><span className="font-medium">Public Key:</span> <span className="font-mono break-all">{publicKey || '-'}</span></div>
-                  <div className="text-xs text-gray-600 mt-2">Fund the address with STRK on Sepolia before pressing Deploy Wallet.</div>
+                  <div>
+                    <span className="font-medium">Wallet ID:</span>{" "}
+                    <span className="font-mono break-all">
+                      {walletId || "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Address:</span>{" "}
+                    <span className="font-mono break-all">
+                      {walletAddress
+                        ? formatStarknetAddress(walletAddress)
+                        : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="font-medium">Public Key:</span>{" "}
+                    <span className="font-mono break-all">
+                      {publicKey || "-"}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-2">
+                    Fund the address with STRK on Sepolia before pressing Deploy
+                    Wallet.
+                  </div>
                 </div>
-                
-                
+
                 {txHash && (
                   <div className="mt-4 text-sm">
-                    <div><span className="font-medium">Deployment Tx:</span> <span className="font-mono break-all">{txHash}</span></div>
+                    <div>
+                      <span className="font-medium">Deployment Tx:</span>{" "}
+                      <span className="font-mono break-all">{txHash}</span>
+                    </div>
                   </div>
                 )}
                 {error && (
-                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{error}</div>
+                  <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                    {error}
+                  </div>
                 )}
               </div>
             </div>
@@ -241,5 +341,5 @@ export default function Home() {
         </div>
       </div>
     </main>
-  )
+  );
 }

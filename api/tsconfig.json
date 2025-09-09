@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "ES2020", // Changed from CommonJS
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
@@ -16,4 +16,3 @@
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
-
