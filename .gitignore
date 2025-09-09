@@ -28,6 +28,8 @@ out/
 .idea/
 *.swp
 *.swo
+.claude
+AGENTS.md
 
 # Temporary files
 tmp/
