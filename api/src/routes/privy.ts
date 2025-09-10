@@ -7,6 +7,8 @@ import {
 } from "../lib/ready";
 import { CallData, RpcProvider } from "starknet";
 const router = Router();
+// Simple in-memory lock to prevent concurrent tx submissions per wallet
+const inFlightWalletOps = new Set<string>();
 
 router.post("/create-wallet", async (req: Request, res: Response) => {
   try {
@@ -289,9 +291,18 @@ router.post("/execute", async (req: Request, res: Response) => {
 // Body: { walletId, contractAddress?, wait?: boolean }
 router.post("/increase-counter", async (req: Request, res: Response) => {
   try {
-    const { walletId, contractAddress, wait } = (req.body || {}) as any;
+    const { walletId, contractAddress, wait, fast } = (req.body || {}) as any;
     if (!walletId)
       return res.status(400).json({ error: "walletId is required" });
+    if (inFlightWalletOps.has(walletId)) {
+      return res
+        .status(429)
+        .json({
+          error:
+            "Another transaction is in progress for this wallet. Please retry shortly.",
+        });
+    }
+    inFlightWalletOps.add(walletId);
     const classHash = process.env.READY_CLASSHASH;
     if (!classHash)
       return res.status(500).json({ error: "READY_CLASSHASH not configured" });
@@ -335,14 +346,41 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
       userJwt,
       userId: authUserId,
       origin,
+      blockIdentifier: fast ? "pre_confirmed" : undefined,
     });
 
-    
-    const result: any = await account.execute({
+    const call = {
       contractAddress: target,
-      entrypoint: process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",
+      entrypoint:
+        process.env.COUNTER_ENTRYPOINT_INCREASE ||
+        process.env.NEXT_PUBLIC_CONTRACT_ENTRY_POINT_INCREASE_COUNTER ||
+        "increase_counter",
       calldata: [],
-    } as any);
+    } as any;
+
+    if (fast && typeof (account as any).fastExecute === "function") {
+      try {
+        const fastResp: any = await (account as any).fastExecute(call);
+        const txHash =
+          fastResp?.txResult?.transaction_hash || fastResp?.transaction_hash;
+        return res.status(200).json({
+          walletId,
+          address,
+          transactionHash: txHash,
+          isReady: !!fastResp?.isReady,
+          mode: "fast",
+          result: fastResp,
+        });
+      } catch (e: any) {
+        // Do not re-submit to avoid duplicate-hash errors; surface error to client
+        return res.status(503).json({
+          error: e?.message || "Fast execution failed",
+          mode: "fast-error",
+        });
+      }
+    }
+    // Normal mode
+    const result: any = await account.execute(call);
     if (wait) {
       try {
         await account.waitForTransaction(result.transaction_hash);
@@ -353,12 +391,18 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
       address,
       transactionHash: result?.transaction_hash,
       result,
+      mode: "normal",
     });
   } catch (error: any) {
     console.error("Error increasing counter:", error);
     return res
       .status(500)
       .json({ error: error.message || "Failed to increase counter" });
+  } finally {
+    try {
+      const { walletId } = (req.body || {}) as any;
+      if (walletId) inFlightWalletOps.delete(walletId);
+    } catch {}
   }
 });
 

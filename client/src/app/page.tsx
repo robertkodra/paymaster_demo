@@ -214,10 +214,13 @@ export default function Home() {
   };
 
   const increaseCounter = async () => {
+    let toastId: any | undefined;
+    let toastDone = false;
     try {
+      if (increasing) return;
       setError(null);
       setIncreasing(true);
-      const toastId = toast.loading("Submitting transaction…");
+      toastId = toast.loading("Submitting transaction…");
       const id = walletId;
       if (!id) {
         const msg = "No walletId found. Create or select a wallet first.";
@@ -247,12 +250,13 @@ export default function Home() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${userJwt}`,
           },
-          body: JSON.stringify({ walletId: id, contractAddress: counterAddress, wait: true }),
+          body: JSON.stringify({ walletId: id, contractAddress: counterAddress, fast: true }),
         }
       );
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data?.error || "Increase counter failed");
-      const txHash: string | undefined = data?.transactionHash;
+      const txHash: string | undefined =
+        data?.transactionHash || data?.txResult?.transaction_hash || data?.result?.transaction_hash;
       if (txHash) {
         const url = `https://sepolia.voyager.online/tx/${txHash}`;
         toast.update(toastId, {
@@ -268,16 +272,31 @@ export default function Home() {
           isLoading: false,
           autoClose: 6000,
         });
+        toastDone = true;
       } else {
         toast.update(toastId, { render: "Counter increased", type: "success", isLoading: false, autoClose: 4000 });
+        toastDone = true;
       }
     } catch (e: any) {
       const msg = e.message || "Increase counter failed";
       setError(msg);
-      toast.error(msg);
+      // Update the existing loading toast into an error toast
+      try {
+        if (toastId) {
+          toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+          toastDone = true;
+        } else {
+          toast.error(msg, { autoClose: 5000 });
+        }
+      } catch {
+        toast.error(msg, { autoClose: 5000 });
+      }
     }
     finally {
       setIncreasing(false);
+      try {
+        if (!toastDone && toastId) toast.dismiss(toastId);
+      } catch {}
     }
   };
 

@@ -159,6 +159,7 @@ export async function getReadyAccountWithPrivySigner({
   userJwt,
   userId,
   origin,
+  blockIdentifier,
 }: {
   walletId: string;
   publicKey: string;
@@ -166,8 +167,12 @@ export async function getReadyAccountWithPrivySigner({
   userJwt: string;
   userId?: string;
   origin?: string;
+  blockIdentifier?: 'pre_confirmed' | 'latest' | 'pending';
 }): Promise<{ account: Account; address: string }> {
-  const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
+  const provider = new RpcProvider({
+    nodeUrl: process.env.RPC_URL,
+    ...(blockIdentifier ? { blockIdentifier } : {}),
+  });
   const constructorCalldata = buildReadyConstructor(publicKey);
   const address = hash.calculateContractAddressFromHash(
     publicKey,
