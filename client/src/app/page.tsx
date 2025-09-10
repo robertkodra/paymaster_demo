@@ -3,6 +3,8 @@
 import { usePrivy } from "@privy-io/react-auth";
 import LoginButton from "@/components/LoginButton";
 import { useEffect, useState } from "react";
+import { useCounter } from "@/hooks/useCounter";
+import { toast } from "react-toastify";
 
 export default function Home() {
   const { ready, authenticated, user, getAccessToken, logout } =
@@ -10,6 +12,7 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [increasing, setIncreasing] = useState(false);
 
   const [walletId, setWalletId] = useState<string | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -25,17 +28,29 @@ export default function Home() {
   const hasExistingStarknetWallet = !!(wallets && wallets.length > 0);
   const hasWallet = !!(walletId || walletAddress || publicKey);
   const baseApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-  const formatStarknetAddress = (
+  function formatStarknetAddress(
     addr: string | null | undefined
-  ): string | null => {
+  ): string | null {
     if (!addr) return null;
     let s = addr.toLowerCase();
     if (!s.startsWith("0x")) s = "0x" + s;
     const body = s.slice(2);
     const padded = body.padStart(64, "0");
     return "0x" + padded;
-  };
+  }
+  const defaultCounterAddress =
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+    process.env.NEXT_PUBLIC_COUNTER_CONTRACT ||
+    "";
+  const [counterAddress] = useState<string>(defaultCounterAddress);
+  const userAddressForCounter = formatStarknetAddress(walletAddress);
+  const { data: counterData } = useCounter(
+    counterAddress || null,
+    userAddressForCounter || null,
+    { intervalMs: 1000 }
+  );
+
+  
 
   // Load previously selected wallet from localStorage on mount
   useEffect(() => {
@@ -199,6 +214,74 @@ export default function Home() {
     }
   };
 
+  const increaseCounter = async () => {
+    try {
+      setError(null);
+      setIncreasing(true);
+      const toastId = toast.loading("Submitting transaction…");
+      const id = walletId;
+      if (!id) {
+        const msg = "No walletId found. Create or select a wallet first.";
+        setError(msg);
+        toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+        return;
+      }
+      let userJwt: string | undefined;
+      try {
+        userJwt =
+          typeof getAccessToken === "function"
+            ? await getAccessToken()
+            : undefined;
+      } catch {}
+      if (!userJwt) {
+        const msg =
+          "Unable to retrieve user session. Please re-login and try again.";
+        setError(msg);
+        toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+        return;
+      }
+      const resp = await fetch(
+        `${baseApi}/privy/increase-counter`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${userJwt}`,
+          },
+          body: JSON.stringify({ walletId: id, contractAddress: counterAddress, wait: true }),
+        }
+      );
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || "Increase counter failed");
+      const txHash: string | undefined = data?.transactionHash;
+      if (txHash) {
+        const url = `https://sepolia.voyager.online/tx/${txHash}`;
+        toast.update(toastId, {
+          render: (
+            <span>
+              Counter increased. View tx:{" "}
+              <a className="underline" href={url} target="_blank" rel="noreferrer">
+                {txHash.slice(0, 10)}…
+              </a>
+            </span>
+          ),
+          type: "success",
+          isLoading: false,
+          autoClose: 6000,
+        });
+      } else {
+        toast.update(toastId, { render: "Counter increased", type: "success", isLoading: false, autoClose: 4000 });
+      }
+    } catch (e: any) {
+      const msg = e.message || "Increase counter failed";
+      setError(msg);
+      toast.error(msg);
+    }
+    finally {
+      setIncreasing(false);
+    }
+  };
+
   // Temporary debug utility to clear local wallet state
   const clearLocal = () => {
     try {
@@ -237,15 +320,7 @@ export default function Home() {
             </div>
           </div>
         )}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-starknet-blue mb-4">
-            Privy Login
-          </h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
-            Sign in with Privy. We will handle Starknet wallet creation and
-            deployment on the backend.
-          </p>
-        </div>
+        {/* Removed title/description and header counter */}
 
         <div className="max-w-xl mx-auto">
           {!authenticated ? (
@@ -265,6 +340,22 @@ export default function Home() {
                   Use the buttons below to create and deploy a Starknet wallet
                   via the backend.
                 </p>
+              </div>
+              {/* Big centered counter + increase button */}
+              <div className="text-center my-8">
+                <div className="text-6xl font-bold text-starknet-blue mb-6">
+                  {counterData?.decimal ?? "0"}
+                </div>
+                <div className="arcade-ring arcade-pulse mx-auto">
+                  <button
+                    onClick={increaseCounter}
+                    className="arcade-btn"
+                    disabled={!walletId || increasing}
+                    aria-label="Increase counter"
+                  >
+                    {increasing ? "..." : "Increase"}
+                  </button>
+                </div>
               </div>
               <div className="card">
                 <div className="flex flex-wrap gap-3">

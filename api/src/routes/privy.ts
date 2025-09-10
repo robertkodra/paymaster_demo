@@ -1,7 +1,23 @@
 import { Router, Request, Response } from "express";
 import { getPrivyClient } from "../lib/privyClient";
-import { computeReadyAddress, deployReadyWithPrivySigner } from "../lib/ready";
+import {
+  computeReadyAddress,
+  deployReadyWithPrivySigner,
+  getReadyAccountWithPrivySigner,
+} from "../lib/ready";
+import { CallData, RpcProvider } from "starknet";
+import {
+  RpcProvider,
+  Account,
+  CallData,
+  CairoOption,
+  CairoOptionVariant,
+  CairoCustomEnum,
+  hash,
+} from "starknet";
 
+import { rawSign } from "../lib/ready";
+import { RawSigner } from "../lib/rawSigner";
 const router = Router();
 
 router.post("/create-wallet", async (req: Request, res: Response) => {
@@ -55,12 +71,10 @@ router.post("/deploy-wallet", async (req: Request, res: Response) => {
 
     // Require authenticated user; we need a user JWT to generate a user signer/key
     const auth = (req as any).auth;
-    const origin = (req.headers?.origin as string | undefined) || process.env.CLIENT_URL;
+    const origin =
+      (req.headers?.origin as string | undefined) || process.env.CLIENT_URL;
     const userJwt: string | undefined = auth?.token;
     const authUserId: string | undefined = auth?.userId;
-
-    console.log("userJwt", userJwt);
-    console.log("authUserId", authUserId);
     if (!userJwt || !authUserId) {
       return res
         .status(401)
@@ -145,6 +159,218 @@ router.get("/user-wallets", async (req: Request, res: Response) => {
     return res
       .status(500)
       .json({ error: error.message || "Failed to fetch user wallets" });
+  }
+});
+
+// Read-only helper to call get_counter() on a contract
+router.get("/counter", async (req: Request, res: Response) => {
+  try {
+    const contractParam = (req.query?.contract as string | undefined) || "";
+    const user = (req.query?.user as string | undefined) || "";
+    const contract =
+      contractParam ||
+      process.env.COUNTER_CONTRACT_ADDRESS ||
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+      "";
+    if (!contract)
+      return res.status(400).json({ error: "contract is required" });
+    if (!user) return res.status(400).json({ error: "user is required" });
+    const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
+    const call = {
+      contractAddress: contract,
+      entrypoint:
+        process.env.COUNTER_ENTRYPOINT_GET ||
+        process.env.NEXT_PUBLIC_CONTRACT_ENTRY_POINT_GET_COUNTER ||
+        "get_counter",
+      calldata: [user],
+    } as any;
+    const result: any = await provider.callContract(call);
+    const arr: string[] = Array.isArray(result?.result)
+      ? result.result
+      : Array.isArray(result)
+      ? result
+      : [];
+    let hex = arr[0] || "0x0";
+    if (typeof hex === "string" && !hex.startsWith("0x")) hex = `0x${hex}`;
+    let decimal = "0";
+    try {
+      decimal = BigInt(hex).toString();
+    } catch {}
+    return res.status(200).json({ hex, decimal, raw: arr });
+  } catch (error: any) {
+    console.error("Error calling get_counter:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to read counter" });
+  }
+});
+
+// Execute a transaction using the Ready account (Privy-backed signer)
+// Body: { walletId, call: { contractAddress, entrypoint, calldata }, wait?: boolean }
+router.post("/execute", async (req: Request, res: Response) => {
+  try {
+    const { walletId, call, calls, wait } = (req.body || {}) as any;
+    if (!walletId)
+      return res.status(400).json({ error: "walletId is required" });
+    const classHash = process.env.READY_CLASSHASH;
+    if (!classHash)
+      return res.status(500).json({ error: "READY_CLASSHASH not configured" });
+
+    // Require authenticated user for signing
+    const auth = (req as any).auth;
+    const origin =
+      (req.headers?.origin as string | undefined) || process.env.CLIENT_URL;
+    const userJwt: string | undefined = auth?.token;
+    const authUserId: string | undefined = auth?.userId;
+    if (!userJwt || !authUserId) {
+      return res
+        .status(401)
+        .json({ error: "Authentication required to execute transactions" });
+    }
+
+    const privy = getPrivyClient();
+    const wallet: any = await privy.walletApi.getWallet({ id: walletId });
+    const chain = wallet?.chainType || wallet?.chain_type;
+    if (!wallet || !chain || chain !== "starknet") {
+      return res
+        .status(400)
+        .json({ error: "Provided wallet is not a Starknet wallet" });
+    }
+    const publicKey: string | undefined = wallet.public_key || wallet.publicKey;
+    if (!publicKey)
+      return res
+        .status(400)
+        .json({ error: "Wallet missing Starknet public key" });
+
+    const { account, address } = await getReadyAccountWithPrivySigner({
+      walletId,
+      publicKey,
+      classHash,
+      userJwt,
+      userId: authUserId,
+      origin,
+    });
+
+    // Normalize call(s)
+    const normalizeOne = (c: any) => {
+      if (!c || !c.contractAddress || !c.entrypoint)
+        throw new Error("call must include contractAddress and entrypoint");
+      let calldata: any = c.calldata ?? [];
+      if (
+        calldata &&
+        !Array.isArray(calldata) &&
+        typeof calldata === "object"
+      ) {
+        calldata = CallData.compile(calldata);
+      }
+      return {
+        contractAddress: c.contractAddress,
+        entrypoint: c.entrypoint,
+        calldata: calldata || [],
+      };
+    };
+    const execCalls = calls
+      ? (calls as any[]).map(normalizeOne)
+      : call
+      ? normalizeOne(call)
+      : null;
+    if (!execCalls)
+      return res.status(400).json({ error: "call or calls is required" });
+
+    const result: any = await account.execute(execCalls as any);
+    if (wait) {
+      try {
+        await account.waitForTransaction(result.transaction_hash);
+      } catch {}
+    }
+    return res.status(200).json({
+      walletId,
+      address,
+      transactionHash: result?.transaction_hash,
+      result,
+    });
+  } catch (error: any) {
+    console.error("Error executing transaction:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to execute transaction" });
+  }
+});
+
+// Domain-specific helper: increase_counter for the authenticated user's Ready account
+// Body: { walletId, contractAddress?, wait?: boolean }
+router.post("/increase-counter", async (req: Request, res: Response) => {
+  try {
+    const { walletId, contractAddress, wait } = (req.body || {}) as any;
+    if (!walletId)
+      return res.status(400).json({ error: "walletId is required" });
+    const classHash = process.env.READY_CLASSHASH;
+    if (!classHash)
+      return res.status(500).json({ error: "READY_CLASSHASH not configured" });
+
+    const target =
+      contractAddress ||
+      process.env.COUNTER_CONTRACT_ADDRESS ||
+      process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+    if (!target)
+      return res.status(400).json({ error: "contractAddress is required" });
+
+    const auth = (req as any).auth;
+    const origin =
+      (req.headers?.origin as string | undefined) || process.env.CLIENT_URL;
+    const userJwt: string | undefined = auth?.token;
+    const authUserId: string | undefined = auth?.userId;
+    if (!userJwt || !authUserId) {
+      return res
+        .status(401)
+        .json({ error: "Authentication required to execute transactions" });
+    }
+
+    const privy = getPrivyClient();
+    const wallet: any = await privy.walletApi.getWallet({ id: walletId });
+    const chain = wallet?.chainType || wallet?.chain_type;
+    if (!wallet || !chain || chain !== "starknet") {
+      return res
+        .status(400)
+        .json({ error: "Provided wallet is not a Starknet wallet" });
+    }
+    const publicKey: string | undefined = wallet.public_key || wallet.publicKey;
+    if (!publicKey)
+      return res
+        .status(400)
+        .json({ error: "Wallet missing Starknet public key" });
+
+    const { account, address } = await getReadyAccountWithPrivySigner({
+      walletId,
+      publicKey,
+      classHash,
+      userJwt,
+      userId: authUserId,
+      origin,
+    });
+
+    console.log("target", target);
+    const result: any = await account.execute({
+      contractAddress: target,
+      entrypoint: process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",
+      calldata: [],
+    } as any);
+    if (wait) {
+      try {
+        await account.waitForTransaction(result.transaction_hash);
+      } catch {}
+    }
+    return res.status(200).json({
+      walletId,
+      address,
+      transactionHash: result?.transaction_hash,
+      result,
+    });
+  } catch (error: any) {
+    console.error("Error increasing counter:", error);
+    return res
+      .status(500)
+      .json({ error: error.message || "Failed to increase counter" });
   }
 });
 

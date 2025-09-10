@@ -6,7 +6,6 @@ import {
   CairoOptionVariant,
   CairoCustomEnum,
   hash,
-  TipEstimate,
 } from "starknet";
 import { RawSigner } from "./rawSigner";
 import {
@@ -82,7 +81,6 @@ export async function rawSign(
     body: JSON.stringify(body),
   });
 
-  // console.log("resp", resp);
   const text = await resp.text();
   let data: any;
   try {
@@ -120,17 +118,17 @@ export async function deployReadyWithPrivySigner({
   origin?: string;
 }) {
   const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
-  const AXConstructorCallData = buildReadyConstructor(publicKey);
-  const AXcontractAddress = hash.calculateContractAddressFromHash(
+  const constructorCalldata = buildReadyConstructor(publicKey);
+  const contractAddress = hash.calculateContractAddressFromHash(
     publicKey,
     classHash,
-    AXConstructorCallData,
+    constructorCalldata,
     0
   );
   
   const account = new Account({
     provider,
-    address: AXcontractAddress,
+    address: contractAddress,
     signer: new (class extends RawSigner {
       async signRaw(messageHash: string): Promise<[string, string]> {
         const sig = await rawSign(walletId, messageHash, {
@@ -144,22 +142,53 @@ export async function deployReadyWithPrivySigner({
     })(),
   });
 
-  
-  // const { suggestedMaxFee: estimatedFee1 } =
-  //   await account.estimateAccountDeployFee({
-  //     classHash,
-  //     contractAddress: AXcontractAddress,
-  //     constructorCalldata: AXConstructorCallData,
-  //     addressSalt: publicKey,
-  //   });
-
-  
   const deployPayload = {
     classHash,
-    contractAddress: AXcontractAddress,
-    constructorCalldata: AXConstructorCallData,
+    contractAddress,
+    constructorCalldata,
     addressSalt: publicKey,
   };
   const res = await account.deployAccount(deployPayload);
   return res;
+}
+
+export async function getReadyAccountWithPrivySigner({
+  walletId,
+  publicKey,
+  classHash,
+  userJwt,
+  userId,
+  origin,
+}: {
+  walletId: string;
+  publicKey: string;
+  classHash: string;
+  userJwt: string;
+  userId?: string;
+  origin?: string;
+}): Promise<{ account: Account; address: string }> {
+  const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
+  const constructorCalldata = buildReadyConstructor(publicKey);
+  const address = hash.calculateContractAddressFromHash(
+    publicKey,
+    classHash,
+    constructorCalldata,
+    0
+  );
+  const account = new Account({
+    provider,
+    address,
+    signer: new (class extends RawSigner {
+      async signRaw(messageHash: string): Promise<[string, string]> {
+        const sig = await rawSign(walletId, messageHash, {
+          userJwt,
+          userId,
+          origin,
+        });
+        const body = sig.slice(2);
+        return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
+      }
+    })(),
+  });
+  return { account, address };
 }

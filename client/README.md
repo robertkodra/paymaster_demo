@@ -1,6 +1,6 @@
 # Starknet Privy (Tier‑2) Client
 
-Next.js frontend showing a minimal Privy Tier‑2 integration for Starknet raw signing. After logging in with Privy, you can sign a Starknet message hash and see the signature (r, s).
+Next.js frontend showing a minimal Privy Tier‑2 integration for creating a Privy wallet and deploying a Ready account on Starknet. The app logs in with Privy and calls the backend to deploy using Privy Wallet API raw_sign.
 
 ## 🚀 Quick Start
 
@@ -52,17 +52,17 @@ Client runs on `http://localhost:3001`
 ## ✨ Features
 
 - 🔐 Privy login (embedded wallet)
-- ✍️ Starknet Tier‑2 raw signing demo (sign a message hash)
+- 🧱 Create Privy Starknet wallet and fetch public key
+- 🚀 Deploy Ready account via backend using raw_sign
 - 🎨 Minimal UI with Tailwind
 
 ## 🎯 Usage
 
 1. Open `http://localhost:3001`
 2. Login with Privy
-3. Click “1) Get Starknet Public Key” — we compute the Ready account address from your Privy Starknet public key and the Ready class hash
-4. Fund the computed address with STRK on Sepolia, tick the checkbox
-5. Click “2) Deploy Account” — uses Privy Tier‑2 raw signing to deploy the account
-6. Optionally, use “Sign Sample Starknet Hash” to test raw signing
+3. Click “Create Wallet” — a Privy Starknet wallet is created (if you don’t already have one)
+4. The app shows the Starknet public key/address; fund the address with STRK on Sepolia
+5. Click “Deploy Wallet” — the backend deploys the Ready account using Privy Tier‑2 raw signing
 
 Notes:
 - Ensure your Privy app has Tier‑2 Starknet enabled.
@@ -110,8 +110,7 @@ npm run build
 **Public key / raw signing not working**
 - Ensure your Privy app has Tier‑2 Starknet enabled
 - Make sure you are logged in and a Privy wallet is available
-- Check the browser console for the exact signature shape returned; the demo normalizes common formats
- - If public key export is unavailable in your SDK version, retrieve the Starknet public key from the Privy API on your backend and inject it into the client.
+- Backend must be configured with PRIVY_APP_ID/PRIVY_APP_SECRET and READY_CLASSHASH
 
 **Build errors**
 - Run `npm run type-check` to identify TypeScript issues

@@ -25,3 +25,98 @@
     @apply bg-white rounded-lg shadow-md border border-gray-200 p-6;
   }
 }
+
+/* Arcade-style red circular button and ring */
+.arcade-btn {
+  position: relative;
+  width: 6.5rem;
+  height: 6.5rem;
+  border-radius: 9999px;
+  background: radial-gradient(120% 120% at 30% 30%, #ff7b7b 0%, #e11d48 50%, #7f1d1d 100%);
+  box-shadow:
+    inset 0 -8px 16px rgba(0,0,0,0.35),
+    inset 0 6px 8px rgba(255,255,255,0.28),
+    0 10px 20px rgba(0,0,0,0.35),
+    0 2px 6px rgba(0,0,0,0.25);
+  border: 2px solid rgba(255,255,255,0.15);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: transform 120ms ease, box-shadow 160ms ease, filter 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.arcade-btn::before {
+  content: "";
+  position: absolute;
+  top: 10%;
+  left: 15%;
+  width: 60%;
+  height: 35%;
+  background: radial-gradient(100% 100% at 50% 0%, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.05) 80%);
+  border-radius: 9999px;
+  filter: blur(0.5px);
+  pointer-events: none;
+}
+
+.arcade-btn::after {
+  content: "";
+  position: absolute;
+  bottom: 8%;
+  right: 15%;
+  width: 35%;
+  height: 20%;
+  background: radial-gradient(100% 100% at 50% 50%, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+  border-radius: 9999px;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.arcade-btn:hover {
+  filter: saturate(1.1);
+  box-shadow:
+    inset 0 -8px 16px rgba(0,0,0,0.32),
+    inset 0 8px 10px rgba(255,255,255,0.3),
+    0 14px 28px rgba(0,0,0,0.4),
+    0 3px 10px rgba(0,0,0,0.25);
+}
+
+.arcade-btn:active {
+  transform: translateY(2px) scale(0.98);
+  box-shadow:
+    inset 0 -5px 12px rgba(0,0,0,0.35),
+    inset 0 3px 6px rgba(255,255,255,0.25),
+    0 8px 18px rgba(0,0,0,0.35),
+    0 2px 8px rgba(0,0,0,0.22);
+}
+
+.arcade-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.arcade-ring {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 9rem;
+  height: 9rem;
+  padding: 0.75rem;
+  border-radius: 9999px;
+  background: radial-gradient(120% 120% at 50% 50%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.15) 40%, rgba(0,0,0,0.15) 100%);
+  box-shadow: inset 0 2px 6px rgba(255,255,255,0.35), inset 0 -4px 10px rgba(0,0,0,0.25);
+}
+
+.arcade-pulse {
+  animation: arcadePulse 1500ms ease-in-out infinite;
+}
+
+@keyframes arcadePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}

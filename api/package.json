@@ -1,7 +1,7 @@
 {
-  "name": "starknet-paymaster-api",
+  "name": "starknet-ready-api",
   "version": "2.0.0",
-  "description": "Backend API for Ready Wallet deployment using Starknet.js v8.5.2 native paymaster (SNIP-29)",
+  "description": "Express API for creating Privy wallets and deploying Ready accounts on Starknet (Sepolia)",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
@@ -10,13 +10,11 @@
   },
   "keywords": [
     "starknet",
-    "paymaster",
     "wallet",
     "starknetjs",
     "ready-wallet",
-    "snip-29",
-    "gasless",
-    "sponsored-transactions"
+    "privy",
+    "raw_sign"
   ],
   "author": "",
   "license": "MIT",

@@ -42,6 +42,6 @@ const { authMiddleware } = require('./middleware/auth')
 app.use('/privy', authMiddleware, require('./routes/privy').default || require('./routes/privy'))
 
 app.listen(PORT, () => {
-  console.log(`Ready Wallet Paymaster Demo v2.0.0`)
+  console.log(`Ready Wallet Demo v2.0.0`)
   console.log(`Server running on http://localhost:${PORT}`)
 })

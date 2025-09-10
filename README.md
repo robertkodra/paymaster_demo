@@ -1,6 +1,6 @@
-# Starknet + Privy Paymaster Demo
+# Starknet + Privy Ready Wallet Demo
 
-This repository contains a minimal full‑stack demo for creating and deploying Ready wallets on Starknet with Privy authentication. The project is split into two independent apps:
+Minimal full‑stack demo for creating Privy wallets and deploying Ready accounts on Starknet (Sepolia) with Privy authentication. The project is split into two independent apps:
 
 - api/ – Express backend (port 3000). Handles Privy server calls and Starknet account deployment via starknet.js.
 - client/ – Next.js frontend (port 3001). Handles login via Privy and simple wallet actions.
@@ -8,7 +8,7 @@ This repository contains a minimal full‑stack demo for creating and deploying 
 ## Project Structure
 
 ```
-paymaster_demo/
+ready_wallet_demo/
 ├─ api/                # Express backend (starknet.js)
 │  ├─ server.ts        # App entry
 │  ├─ src/             # Routes, libs, middleware
@@ -58,8 +58,8 @@ Access:
 
 ## Notes
 
-- Wallet deployment requires funding the computed Starknet address on the chosen network.
-- Privy server API calls require correct app credentials. Some endpoints may also require a Privy Wallet Authorization key.
+- Fund the computed Starknet address with STRK before deploying (no paymaster in this demo).
+- The API uses Basic (app id/secret) and user authorization signatures to call Privy Wallet API; Origin is forwarded.
 - The codebase favors clarity and minimal dependencies; server and client run independently for easier debugging.
 
 ## License

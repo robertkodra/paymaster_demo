@@ -1,5 +1,5 @@
 {
-  "name": "starknet-paymaster-client",
+  "name": "starknet-ready-client",
   "version": "1.0.0",
   "description": "Next.js frontend for Starknet Ready Wallet deployment with Privy authentication",
   "private": true,
@@ -14,6 +14,7 @@
     "@privy-io/react-auth": "^1.88.4",
     "@tanstack/react-query": "^5.0.0",
     "next": "14.2.21",
+    "react-toastify": "^10.0.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
