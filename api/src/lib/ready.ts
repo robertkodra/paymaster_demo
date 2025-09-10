@@ -125,7 +125,7 @@ export async function deployReadyWithPrivySigner({
     constructorCalldata,
     0
   );
-  
+
   const account = new Account({
     provider,
     address: contractAddress,

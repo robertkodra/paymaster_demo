@@ -6,18 +6,6 @@ import {
   getReadyAccountWithPrivySigner,
 } from "../lib/ready";
 import { CallData, RpcProvider } from "starknet";
-import {
-  RpcProvider,
-  Account,
-  CallData,
-  CairoOption,
-  CairoOptionVariant,
-  CairoCustomEnum,
-  hash,
-} from "starknet";
-
-import { rawSign } from "../lib/ready";
-import { RawSigner } from "../lib/rawSigner";
 const router = Router();
 
 router.post("/create-wallet", async (req: Request, res: Response) => {
@@ -349,7 +337,7 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
       origin,
     });
 
-    console.log("target", target);
+    
     const result: any = await account.execute({
       contractAddress: target,
       entrypoint: process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",

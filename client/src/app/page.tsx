@@ -25,7 +25,6 @@ export default function Home() {
     publicKey?: string;
   }> | null>(null);
 
-  const hasExistingStarknetWallet = !!(wallets && wallets.length > 0);
   const hasWallet = !!(walletId || walletAddress || publicKey);
   const baseApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
   function formatStarknetAddress(
