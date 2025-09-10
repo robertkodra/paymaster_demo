@@ -6,6 +6,7 @@ import {
   CairoOptionVariant,
   CairoCustomEnum,
   hash,
+  TipEstimate,
 } from "starknet";
 import { RawSigner } from "./rawSigner";
 import {
@@ -74,7 +75,7 @@ export async function rawSign(
     `${appId}:${appSecret}`
   ).toString("base64")}`;
 
-  // if (opts.origin) headers["Origin"] = opts.origin;
+  if (opts.origin) headers["Origin"] = opts.origin;
   const resp = await fetch(url, {
     method: "POST",
     headers,
@@ -90,7 +91,6 @@ export async function rawSign(
     throw new Error(`Invalid JSON response: ${text}`);
   }
 
-  console.log("data", data);
   if (!resp.ok)
     throw new Error(data?.error || data?.message || `HTTP ${resp.status}`);
   const sig: string | undefined =
@@ -127,7 +127,7 @@ export async function deployReadyWithPrivySigner({
     AXConstructorCallData,
     0
   );
-  console.log("Provider", provider);
+  
   const account = new Account({
     provider,
     address: AXcontractAddress,
@@ -144,12 +144,22 @@ export async function deployReadyWithPrivySigner({
     })(),
   });
 
-  console.log(account);
-  const res = await account.deployAccount({
+  
+  // const { suggestedMaxFee: estimatedFee1 } =
+  //   await account.estimateAccountDeployFee({
+  //     classHash,
+  //     contractAddress: AXcontractAddress,
+  //     constructorCalldata: AXConstructorCallData,
+  //     addressSalt: publicKey,
+  //   });
+
+  
+  const deployPayload = {
     classHash,
     contractAddress: AXcontractAddress,
     constructorCalldata: AXConstructorCallData,
     addressSalt: publicKey,
-  });
+  };
+  const res = await account.deployAccount(deployPayload);
   return res;
 }
