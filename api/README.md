@@ -1,6 +1,6 @@
 # API (Express + TypeScript)
 
-Backend service to create Privy wallets, fetch wallet details, and deploy a Ready account on Starknet using starknet.js. It implements Privy Wallet API raw_sign via user authorization signatures and Basic app auth.
+Backend service to create Privy wallets, fetch wallet details, and deploy a Ready account on Starknet using starknet.js. It implements Privy Wallet API raw_sign via user authorization signatures and Basic app auth. Optional SNIP‑29 paymaster support can deploy + execute an initial call using sponsored or gas‑token modes.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ Env loading order
 ## Environment variables
 
 Required
-- RPC_URL – Starknet RPC (e.g., Sepolia Alchemy v0_8)
+- RPC_URL – Starknet RPC (e.g., Sepolia v0_8 or v0_9)
 - READY_CLASSHASH – Ready account class hash
 - PRIVY_APP_ID – Privy app id
 - PRIVY_APP_SECRET – Privy app secret
@@ -45,6 +45,14 @@ Optional
     - NEXT_PUBLIC_CONTRACT_ENTRY_POINT_GET_COUNTER
     - NEXT_PUBLIC_CONTRACT_ENTRY_POINT_INCREASE_COUNTER
 
+Paymaster (optional)
+- PAYMASTER_URL – Paymaster RPC URL (e.g., https://sepolia.paymaster.avnu.fi)
+- PAYMASTER_MODE – 'sponsored' (dApp pays) or 'default' (user pays in gas token)
+- PAYMASTER_API_KEY – required when PAYMASTER_MODE='sponsored'
+- GAS_TOKEN_ADDRESS – required when PAYMASTER_MODE='default' (if not selecting first supported token)
+- CONTRACT_ADDRESS – optional contract for initial call
+- CONTRACT_ENTRY_POINT_GET_COUNTER – entrypoint for initial call (default get_counter)
+
 ## Endpoints
 
 Health
@@ -57,6 +65,7 @@ Wallets
 
 Deploy
 - POST /privy/deploy-wallet → body: { walletId } and Authorization: Bearer <user JWT> → deploys Ready account (address derived from public key + class hash)
+   - If paymaster env is configured, deployment uses SNIP‑29 paymaster and executes an initial call with either sponsored or gas‑token mode
 
 Execute
 - POST /privy/execute → body: { walletId, call|calls, wait? } with Authorization → executes a Starknet call using the Ready account
