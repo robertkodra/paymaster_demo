@@ -77,3 +77,27 @@ Read-only helpers
 Notes
 - Fund the computed address with STRK before deployment (unless using a paymaster, not included here).
 - Wallet API calls use Basic (app id/secret) and user authorization signatures; the browser Origin is forwarded.
+
+## Helper Functions (internal)
+
+These are exported from `api/src/lib/ready.ts` and used by routes:
+
+- `deployReadyAccount(opts)`
+  - Deploys the Ready account using the Privy-backed signer. If paymaster env is configured, uses SNIP‑29 and performs an initial call.
+- `getReadyAccount(opts)`
+  - Returns `{ account, address }` for the user’s Ready account (no paymaster attached).
+- `buildReadyAccount(opts)`
+  - Like `getReadyAccount`, but can optionally attach `paymasterRpc` for SNIP‑29 flows. Used by the increase‑counter route.
+
+Minimal usage example (TypeScript):
+
+```ts
+import { deployReadyAccount, getReadyAccount } from './src/lib/ready'
+
+// Deploy
+await deployReadyAccount({ walletId, publicKey, classHash, userJwt })
+
+// Use account
+const { account, address } = await getReadyAccount({ walletId, publicKey, classHash, userJwt })
+const res = await account.execute({ contractAddress, entrypoint: 'ping', calldata: [] })
+```

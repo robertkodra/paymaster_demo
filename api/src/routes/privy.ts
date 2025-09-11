@@ -1,14 +1,9 @@
 import { Router, Request, Response } from "express";
 import { getPrivyClient } from "../lib/privyClient";
-import {
-  computeReadyAddress,
-  deployReadyWithPrivySigner,
-  getReadyAccountWithPrivySigner,
-} from "../lib/ready";
-import { Account, CallData } from "starknet";
-import { rawSign } from "../lib/ready";
-import { RawSigner } from "../lib/rawSigner";
+import { computeReadyAddress, deployReadyAccount, getReadyAccount, buildReadyAccount } from "../lib/ready";
+import { CallData } from "starknet";
 import { getRpcProvider, setupPaymaster } from "../lib/provider";
+import { getStarknetWallet } from "../lib/wallet";
 const router = Router();
 
 router.post("/create-wallet", async (req: Request, res: Response) => {
@@ -72,24 +67,11 @@ router.post("/deploy-wallet", async (req: Request, res: Response) => {
         .json({ error: "Authentication required to deploy wallet" });
     }
 
-    const privy = getPrivyClient();
-    const wallet: any = await privy.walletApi.getWallet({ id: walletId });
-    const chain = wallet?.chainType || wallet?.chain_type;
-    if (!wallet || !chain || chain !== "starknet") {
-      return res
-        .status(400)
-        .json({ error: "Provided wallet is not a Starknet wallet" });
-    }
-    // Do not compare wallet.ownerId to userId: ownerId may be a key quorum id, not a user id.
-    // The Wallets API enforces ownership via the user-signed authorization on raw_sign.
-    const publicKey: string | undefined = wallet.public_key || wallet.publicKey;
-    if (!publicKey)
-      return res
-        .status(400)
-        .json({ error: "Wallet missing Starknet public key" });
+    // Wallet API enforces ownership via user-signed authorization on raw_sign.
+    const { publicKey } = await getStarknetWallet(walletId);
     const address = computeReadyAddress(publicKey);
 
-    const deployResult: any = await deployReadyWithPrivySigner({
+    const deployResult: any = await deployReadyAccount({
       walletId,
       publicKey,
       classHash,
@@ -219,28 +201,16 @@ router.post("/execute", async (req: Request, res: Response) => {
         .json({ error: "Authentication required to execute transactions" });
     }
 
-    const privy = getPrivyClient();
-    const wallet: any = await privy.walletApi.getWallet({ id: walletId });
-    const chain = wallet?.chainType || wallet?.chain_type;
-    if (!wallet || !chain || chain !== "starknet") {
-      return res
-        .status(400)
-        .json({ error: "Provided wallet is not a Starknet wallet" });
-    }
-    const publicKey: string | undefined = wallet.public_key || wallet.publicKey;
-    if (!publicKey)
-      return res
-        .status(400)
-        .json({ error: "Wallet missing Starknet public key" });
+    const { publicKey } = await getStarknetWallet(walletId);
 
-    const { account, address } = await getReadyAccountWithPrivySigner({
-      walletId,
-      publicKey,
-      classHash,
-      userJwt,
-      userId: authUserId,
-      origin,
-    });
+      const { account, address } = await getReadyAccount({
+        walletId,
+        publicKey,
+        classHash,
+        userJwt,
+        userId: authUserId,
+        origin,
+      });
 
     // Normalize call(s)
     const normalizeOne = (c: any) => {
@@ -317,19 +287,7 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
         .json({ error: "Authentication required to execute transactions" });
     }
 
-    const privy = getPrivyClient();
-    const wallet: any = await privy.walletApi.getWallet({ id: walletId });
-    const chain = wallet?.chainType || wallet?.chain_type;
-    if (!wallet || !chain || chain !== "starknet") {
-      return res
-        .status(400)
-        .json({ error: "Provided wallet is not a Starknet wallet" });
-    }
-    const publicKey: string | undefined = wallet.public_key || wallet.publicKey;
-    if (!publicKey)
-      return res
-        .status(400)
-        .json({ error: "Wallet missing Starknet public key" });
+    const { publicKey } = await getStarknetWallet(walletId);
 
     // If paymaster is configured, use SNIP-29 path; otherwise use normal execute
     const usePaymaster = !!(
@@ -346,24 +304,14 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
       }
       const { paymasterRpc, isSponsored, gasToken } = config;
 
-      const provider = getRpcProvider();
-
-      const address = computeReadyAddress(publicKey);
-      const account = new Account({
-        provider,
-        address,
-        signer: new (class extends RawSigner {
-          async signRaw(messageHash: string): Promise<[string, string]> {
-            const sig = await rawSign(walletId, messageHash, {
-              userJwt,
-              userId: authUserId,
-              origin,
-            });
-            const body = sig.slice(2);
-            return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
-          }
-        })(),
-        paymaster: paymasterRpc,
+      const { account, address } = await buildReadyAccount({
+        walletId,
+        publicKey,
+        classHash,
+        userJwt,
+        userId: authUserId,
+        origin,
+        paymasterRpc,
       });
 
       const call = {
@@ -402,7 +350,7 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
         mode: isSponsored ? "sponsored" : "default",
       });
     } else {
-      const { account, address } = await getReadyAccountWithPrivySigner({
+      const { account, address } = await getReadyAccount({
         walletId,
         publicKey,
         classHash,

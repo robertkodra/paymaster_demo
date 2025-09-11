@@ -1,6 +1,6 @@
-# Starknet Privy (Tier‑2) Client
+# Starknet + Privy Client
 
-Next.js frontend showing a minimal Privy Tier‑2 integration for creating a Privy wallet and deploying a Ready account on Starknet. The app logs in with Privy and calls the backend to deploy using Privy Wallet API raw_sign.
+Next.js frontend for the Ready Wallet demo. It logs in with Privy, calls the backend to create a Privy wallet and deploy a Ready account using the Privy Wallet API (raw_sign), and includes a simple Counter read/write.
 
 ## 🚀 Quick Start
 
@@ -26,14 +26,14 @@ Edit `.env.local` with your configuration:
 # Required - Get from https://dashboard.privy.io
 NEXT_PUBLIC_PRIVY_APP_ID=your_privy_app_id_here
 
-# (Optional) API connection for future server features
+# Backend API URL
 NEXT_PUBLIC_API_URL=http://localhost:3000
 
-# Ready account class hash (required)
-NEXT_PUBLIC_READY_CLASSHASH=0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f
+# Counter demo (read + write)
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x... # counter contract address
 
-# (Optional) Custom Starknet RPC (defaults to Sepolia v0_8)
-# NEXT_PUBLIC_RPC_URL=https://starknet-sepolia.public.blastapi.io/rpc/v0_8
+# (Optional) Explorer base for tx links
+# NEXT_PUBLIC_EXPLORER_TX_BASE=https://sepolia.voyager.online/tx
 ```
 
 ### Run
@@ -53,7 +53,9 @@ Client runs on `http://localhost:3001`
 
 - 🔐 Privy login (embedded wallet)
 - 🧱 Create Privy Starknet wallet and fetch public key
-- 🚀 Deploy Ready account via backend using raw_sign
+- 🚀 Deploy Ready account via backend (raw_sign; paymaster optional on server)
+- 🔢 Live counter (polls get_counter(user) every second)
+- 🔴 Big “Increase” button sends a transaction; toast shows tx link
 - 🎨 Minimal UI with Tailwind
 
 ## 🎯 Usage
@@ -61,12 +63,12 @@ Client runs on `http://localhost:3001`
 1. Open `http://localhost:3001`
 2. Login with Privy
 3. Click “Create Wallet” — a Privy Starknet wallet is created (if you don’t already have one)
-4. The app shows the Starknet public key/address; fund the address with STRK on Sepolia
-5. Click “Deploy Wallet” — the backend deploys the Ready account using Privy Tier‑2 raw signing
+4. Click “Deploy Wallet” — backend deploys the Ready account (paymaster if configured)
+5. The big number shows your counter; smash “Increase” to send a tx
 
 Notes:
-- Ensure your Privy app has Tier‑2 Starknet enabled.
-- You must fund the account with STRK before deploying.
+- Ensure your Privy app has Starknet Tier‑2/Wallet API enabled.
+- If paymaster isn’t configured on the server, deploys and txs require funding the account.
 
 ## ⚙️ Configuration
 
@@ -108,7 +110,7 @@ npm run build
 - Ensure no extra spaces in environment variables
 
 **Public key / raw signing not working**
-- Ensure your Privy app has Tier‑2 Starknet enabled
+- Ensure your Privy app has Starknet Tier‑2/Wallet API enabled
 - Make sure you are logged in and a Privy wallet is available
 - Backend must be configured with PRIVY_APP_ID/PRIVY_APP_SECRET and READY_CLASSHASH
 
@@ -123,13 +125,9 @@ npm run build
 - Tailwind CSS
 - TypeScript
 
-## 📱 Supported Authentication Methods
+## 📱 Authentication Methods
 
-- Email/Password
-- Google
-- Twitter
-- Discord
-- External wallets (MetaMask, etc.)
+- Email/Password, Google, Twitter, Discord (configurable in Privy)
 
 ## 📄 License
 

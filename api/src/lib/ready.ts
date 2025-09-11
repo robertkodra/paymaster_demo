@@ -1,5 +1,5 @@
 import { Account, CallData, CairoOption, CairoOptionVariant, CairoCustomEnum, hash, num } from "starknet";
-import { getRpcProvider, getPaymasterRpc, setupPaymaster } from "./provider";
+import { getRpcProvider, setupPaymaster } from "./provider";
 import { RawSigner } from "./rawSigner";
 import {
   buildAuthorizationSignature,
@@ -13,6 +13,10 @@ function buildReadyConstructor(publicKey: string) {
   return CallData.compile({ owner: signerEnum, guardian });
 }
 
+/**
+ * Compute the Ready account address for a given public key.
+ * Uses READY_CLASSHASH from environment for the class hash.
+ */
 export function computeReadyAddress(publicKey: string) {
   const calldata = buildReadyConstructor(publicKey);
   return hash.calculateContractAddressFromHash(
@@ -21,6 +25,50 @@ export function computeReadyAddress(publicKey: string) {
     calldata,
     0
   );
+}
+
+export async function buildReadyAccount({
+  walletId,
+  publicKey,
+  classHash,
+  userJwt,
+  userId,
+  origin,
+  paymasterRpc,
+}: {
+  walletId: string;
+  publicKey: string;
+  classHash: string;
+  userJwt: string;
+  userId?: string;
+  origin?: string;
+  paymasterRpc?: any;
+}): Promise<{ account: Account; address: string }> {
+  const provider = getRpcProvider();
+  const constructorCalldata = buildReadyConstructor(publicKey);
+  const address = hash.calculateContractAddressFromHash(
+    publicKey,
+    classHash,
+    constructorCalldata,
+    0
+  );
+  const account = new Account({
+    provider,
+    address,
+    signer: new (class extends RawSigner {
+      async signRaw(messageHash: string): Promise<[string, string]> {
+        const sig = await rawSign(walletId, messageHash, {
+          userJwt,
+          userId,
+          origin,
+        });
+        const body = sig.slice(2);
+        return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
+      }
+    })(),
+    ...(paymasterRpc ? { paymaster: paymasterRpc } : {}),
+  });
+  return { account, address };
 }
 
 export async function rawSign(
@@ -95,7 +143,7 @@ export async function rawSign(
   return sig.startsWith("0x") ? sig : `0x${sig}`;
 }
 
-export async function deployReadyWithPrivySigner({
+export async function deployReadyAccount({
   walletId,
   publicKey,
   classHash,
@@ -138,21 +186,14 @@ export async function deployReadyWithPrivySigner({
     version: 1,
   } as const;
 
-  const account = new Account({
-    provider,
-    address: contractAddress,
-    signer: new (class extends RawSigner {
-      async signRaw(messageHash: string): Promise<[string, string]> {
-        const sig = await rawSign(walletId, messageHash, {
-          userJwt,
-          userId,
-          origin,
-        });
-        const body = sig.slice(2);
-        return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
-      }
-    })(),
-    paymaster: paymasterRpc,
+  const { account } = await buildReadyAccount({
+    walletId,
+    publicKey,
+    classHash,
+    userJwt,
+    userId,
+    origin,
+    paymasterRpc,
   });
 
   // Initial call to execute after deployment
@@ -212,7 +253,7 @@ export async function deployReadyWithPrivySigner({
   return res;
 }
 
-export async function getReadyAccountWithPrivySigner({
+export async function getReadyAccount({
   walletId,
   publicKey,
   classHash,
@@ -227,29 +268,12 @@ export async function getReadyAccountWithPrivySigner({
   userId?: string;
   origin?: string;
 }): Promise<{ account: Account; address: string }> {
-  const provider = getRpcProvider();
-
-  const constructorCalldata = buildReadyConstructor(publicKey);
-  const address = hash.calculateContractAddressFromHash(
+  return buildReadyAccount({
+    walletId,
     publicKey,
     classHash,
-    constructorCalldata,
-    0
-  );
-  const account = new Account({
-    provider,
-    address,
-    signer: new (class extends RawSigner {
-      async signRaw(messageHash: string): Promise<[string, string]> {
-        const sig = await rawSign(walletId, messageHash, {
-          userJwt,
-          userId,
-          origin,
-        });
-        const body = sig.slice(2);
-        return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
-      }
-    })(),
+    userJwt,
+    userId,
+    origin,
   });
-  return { account, address };
 }

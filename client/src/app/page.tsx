@@ -5,13 +5,14 @@ import LoginButton from "@/components/LoginButton";
 import { useEffect, useState } from "react";
 import { useCounter } from "@/hooks/useCounter";
 import { toast } from "react-toastify";
+import { formatStarknetAddress, txExplorerUrl } from "@/utils/format";
+import { STORAGE_KEYS } from "@/utils/storage";
 
 export default function Home() {
   const { ready, authenticated, user, getAccessToken, logout } =
     usePrivy() as any;
   const [creating, setCreating] = useState(false);
   const [deploying, setDeploying] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [increasing, setIncreasing] = useState(false);
 
   const [walletId, setWalletId] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export default function Home() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deployed, setDeployed] = useState<boolean>(false);
   const [wallets, setWallets] = useState<Array<{
     id: string;
     address: string;
@@ -27,16 +29,6 @@ export default function Home() {
 
   const hasWallet = !!(walletId || walletAddress || publicKey);
   const baseApi = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-  function formatStarknetAddress(
-    addr: string | null | undefined
-  ): string | null {
-    if (!addr) return null;
-    let s = addr.toLowerCase();
-    if (!s.startsWith("0x")) s = "0x" + s;
-    const body = s.slice(2);
-    const padded = body.padStart(64, "0");
-    return "0x" + padded;
-  }
   const defaultCounterAddress =
     process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
     process.env.NEXT_PUBLIC_COUNTER_CONTRACT ||
@@ -51,36 +43,73 @@ export default function Home() {
 
   
 
-  // Load previously selected wallet from localStorage on mount
+  // Sync local state with localStorage for the current Privy user
   useEffect(() => {
     try {
-      const lsId = window.localStorage.getItem("starknet_wallet_id");
-      const lsAddr = window.localStorage.getItem("starknet_wallet_address");
-      const lsPk = window.localStorage.getItem("starknet_public_key");
+      if (!authenticated || !user?.id) return;
+      const storedUser = window.localStorage.getItem(STORAGE_KEYS.userId);
+      if (storedUser && storedUser !== user.id) {
+        // Different user logged in → clear previous user's wallet state
+        window.localStorage.removeItem(STORAGE_KEYS.walletId);
+        window.localStorage.removeItem(STORAGE_KEYS.walletAddress);
+        window.localStorage.removeItem(STORAGE_KEYS.publicKey);
+        window.localStorage.removeItem(STORAGE_KEYS.deployedWalletId);
+        setWalletId(null);
+        setWalletAddress(null);
+        setPublicKey(null);
+        setTxHash(null);
+        setWallets(null);
+        setError(null);
+        setDeployed(false);
+      }
+      // Record current user id
+      window.localStorage.setItem(STORAGE_KEYS.userId, user.id);
+      // Load cached wallet for this user (if any)
+      const lsId = window.localStorage.getItem(STORAGE_KEYS.walletId);
+      const lsAddr = window.localStorage.getItem(STORAGE_KEYS.walletAddress);
+      const lsPk = window.localStorage.getItem(STORAGE_KEYS.publicKey);
       if (lsId) setWalletId(lsId);
       if (lsAddr) setWalletAddress(lsAddr);
       if (lsPk) setPublicKey(lsPk);
     } catch {}
-  }, []);
+  }, [authenticated, user?.id]);
 
   // Persist to localStorage when values change
   useEffect(() => {
     try {
-      if (walletId) window.localStorage.setItem("starknet_wallet_id", walletId);
+      if (walletId) window.localStorage.setItem(STORAGE_KEYS.walletId, walletId);
     } catch {}
   }, [walletId]);
   useEffect(() => {
     try {
       if (walletAddress)
-        window.localStorage.setItem("starknet_wallet_address", walletAddress);
+        window.localStorage.setItem(STORAGE_KEYS.walletAddress, walletAddress);
     } catch {}
   }, [walletAddress]);
   useEffect(() => {
     try {
       if (publicKey)
-        window.localStorage.setItem("starknet_public_key", publicKey);
+        window.localStorage.setItem(STORAGE_KEYS.publicKey, publicKey);
     } catch {}
   }, [publicKey]);
+  // Reflect deployed flag when walletId changes
+  useEffect(() => {
+    try {
+      const lsDeployed = window.localStorage.getItem(STORAGE_KEYS.deployedWalletId);
+      setDeployed(!!(walletId && lsDeployed && lsDeployed === walletId));
+    } catch {
+      setDeployed(false);
+    }
+  }, [walletId]);
+
+  // Ensure we store the current user id in localStorage when authenticated
+  useEffect(() => {
+    try {
+      if (authenticated && user?.id) {
+        window.localStorage.setItem(STORAGE_KEYS.userId, user.id);
+      }
+    } catch {}
+  }, [authenticated, user?.id]);
 
   const fetchWallets = async () => {
     try {
@@ -88,11 +117,9 @@ export default function Home() {
       // If values already exist (from localStorage or previous fetch), don't overwrite them on refresh
       if (walletId || walletAddress || publicKey) return;
       setError(null);
-      setRefreshing(true);
+      // fetch wallets from backend
       const resp = await fetch(
-        `${baseApi}/privy/user-wallets?userId=${encodeURIComponent(
-          user.id
-        )}&t=${Date.now()}`
+        `${baseApi}/privy/user-wallets?userId=${encodeURIComponent(user.id)}&t=${Date.now()}`
       );
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data?.error || "Failed to fetch wallets");
@@ -127,7 +154,7 @@ export default function Home() {
     } catch (e: any) {
       setError(e.message || "Failed to fetch wallets");
     } finally {
-      setRefreshing(false);
+      // done fetching
     }
   };
 
@@ -206,6 +233,10 @@ export default function Home() {
       setTxHash(data.transactionHash || null);
       setWalletAddress(formatStarknetAddress(data.address) || walletAddress);
       setPublicKey(data.publicKey || publicKey);
+      try {
+        window.localStorage.setItem("starknet_deployed_wallet_id", id);
+        setDeployed(true);
+      } catch {}
     } catch (e: any) {
       setError(e.message || "Deploy failed");
     } finally {
@@ -214,15 +245,22 @@ export default function Home() {
   };
 
   const increaseCounter = async () => {
+    let toastId: any | undefined;
+    let toastDone = false;
     try {
       setError(null);
       setIncreasing(true);
-      const toastId = toast.loading("Submitting transaction…");
+      toastId = toast.loading("Submitting transaction…");
       const id = walletId;
       if (!id) {
         const msg = "No walletId found. Create or select a wallet first.";
         setError(msg);
-        toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+        if (toastId) {
+          toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+          toastDone = true;
+        } else {
+          toast.error(msg, { autoClose: 5000 });
+        }
         return;
       }
       let userJwt: string | undefined;
@@ -236,26 +274,28 @@ export default function Home() {
         const msg =
           "Unable to retrieve user session. Please re-login and try again.";
         setError(msg);
-        toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+        if (toastId) {
+          toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+          toastDone = true;
+        } else {
+          toast.error(msg, { autoClose: 5000 });
+        }
         return;
       }
-      const resp = await fetch(
-        `${baseApi}/privy/increase-counter`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${userJwt}`,
-          },
-          body: JSON.stringify({ walletId: id, contractAddress: counterAddress, wait: true }),
-        }
-      );
+      const resp = await fetch(`${baseApi}/privy/increase-counter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userJwt}`,
+        },
+        body: JSON.stringify({ walletId: id, contractAddress: counterAddress, wait: true }),
+      });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data?.error || "Increase counter failed");
       const txHash: string | undefined = data?.transactionHash;
       if (txHash) {
-        const url = `https://sepolia.voyager.online/tx/${txHash}`;
-        toast.update(toastId, {
+        const url = txExplorerUrl(txHash);
+        toast.update(toastId!, {
           render: (
             <span>
               Counter increased. View tx:{" "}
@@ -268,16 +308,26 @@ export default function Home() {
           isLoading: false,
           autoClose: 6000,
         });
+        toastDone = true;
       } else {
-        toast.update(toastId, { render: "Counter increased", type: "success", isLoading: false, autoClose: 4000 });
+        toast.update(toastId!, { render: "Counter increased", type: "success", isLoading: false, autoClose: 4000 });
+        toastDone = true;
       }
     } catch (e: any) {
       const msg = e.message || "Increase counter failed";
       setError(msg);
-      toast.error(msg);
+      if (toastId) {
+        toast.update(toastId, { render: msg, type: "error", isLoading: false, autoClose: 5000 });
+        toastDone = true;
+      } else {
+        toast.error(msg, { autoClose: 5000 });
+      }
     }
     finally {
       setIncreasing(false);
+      try {
+        if (!toastDone && toastId) toast.dismiss(toastId);
+      } catch {}
     }
   };
 
@@ -287,6 +337,7 @@ export default function Home() {
       window.localStorage.removeItem("starknet_wallet_id");
       window.localStorage.removeItem("starknet_wallet_address");
       window.localStorage.removeItem("starknet_public_key");
+      window.localStorage.removeItem("starknet_deployed_wallet_id");
     } catch {}
     setWalletId(null);
     setWalletAddress(null);
@@ -294,6 +345,17 @@ export default function Home() {
     setTxHash(null);
     setWallets(null);
     setError(null);
+    (setDeployed as any)(false);
+  };
+
+  // Logout handler: clear cached wallet state before logging out
+  const handleLogout = async () => {
+    try {
+      clearLocal();
+    } catch {}
+    try {
+      await logout();
+    } catch {}
   };
 
   if (!ready) {
@@ -313,7 +375,7 @@ export default function Home() {
               <span className="text-sm text-gray-700 truncate max-w-[280px]">
                 {user?.email?.address || user?.id}
               </span>
-              <button onClick={logout} className="btn-secondary">
+              <button onClick={handleLogout} className="btn-secondary">
                 Logout
               </button>
             </div>
@@ -345,7 +407,7 @@ export default function Home() {
                 <div className="text-6xl font-bold text-starknet-blue mb-6">
                   {counterData?.decimal ?? "0"}
                 </div>
-                <div className="arcade-ring arcade-pulse mx-auto">
+                <div className="arcade-ring mx-auto">
                   <button
                     onClick={increaseCounter}
                     className="arcade-btn"
@@ -373,9 +435,16 @@ export default function Home() {
                   <button
                     onClick={deployWallet}
                     className="btn-secondary"
-                    disabled={deploying || !walletId}
+                    disabled={deploying || !walletId || deployed}
+                    title={
+                      deployed
+                        ? "Wallet already deployed"
+                        : !walletId
+                        ? "Create a wallet first"
+                        : undefined
+                    }
                   >
-                    {deploying ? "Deploying…" : "Deploy Wallet"}
+                    {deploying ? "Deploying…" : deployed ? "Deployed" : "Deploy Wallet"}
                   </button>
                   <button
                     onClick={clearLocal}
@@ -406,10 +475,7 @@ export default function Home() {
                       {publicKey || "-"}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-600 mt-2">
-                    Fund the address with STRK on Sepolia before pressing Deploy
-                    Wallet.
-                  </div>
+                  
                 </div>
 
                 {txHash && (
