@@ -5,7 +5,10 @@ import {
   deployReadyWithPrivySigner,
   getReadyAccountWithPrivySigner,
 } from "../lib/ready";
-import { CallData, RpcProvider } from "starknet";
+import { Account, CallData } from "starknet";
+import { rawSign } from "../lib/ready";
+import { RawSigner } from "../lib/rawSigner";
+import { getRpcProvider, setupPaymaster } from "../lib/provider";
 const router = Router();
 
 router.post("/create-wallet", async (req: Request, res: Response) => {
@@ -163,7 +166,7 @@ router.get("/counter", async (req: Request, res: Response) => {
     if (!contract)
       return res.status(400).json({ error: "contract is required" });
     if (!user) return res.status(400).json({ error: "user is required" });
-    const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
+    const provider = getRpcProvider();
     const call = {
       contractAddress: contract,
       entrypoint:
@@ -328,32 +331,103 @@ router.post("/increase-counter", async (req: Request, res: Response) => {
         .status(400)
         .json({ error: "Wallet missing Starknet public key" });
 
-    const { account, address } = await getReadyAccountWithPrivySigner({
-      walletId,
-      publicKey,
-      classHash,
-      userJwt,
-      userId: authUserId,
-      origin,
-    });
-
-    
-    const result: any = await account.execute({
-      contractAddress: target,
-      entrypoint: process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",
-      calldata: [],
-    } as any);
-    if (wait) {
+    // If paymaster is configured, use SNIP-29 path; otherwise use normal execute
+    const usePaymaster = !!(
+      process.env.PAYMASTER_URL || process.env.PAYMASTER_MODE
+    );
+    if (usePaymaster) {
+      let config;
       try {
-        await account.waitForTransaction(result.transaction_hash);
-      } catch {}
+        config = await setupPaymaster();
+      } catch (e: any) {
+        return res
+          .status(500)
+          .json({ error: e?.message || "Failed to initialize paymaster" });
+      }
+      const { paymasterRpc, isSponsored, gasToken } = config;
+
+      const provider = getRpcProvider();
+
+      const address = computeReadyAddress(publicKey);
+      const account = new Account({
+        provider,
+        address,
+        signer: new (class extends RawSigner {
+          async signRaw(messageHash: string): Promise<[string, string]> {
+            const sig = await rawSign(walletId, messageHash, {
+              userJwt,
+              userId: authUserId,
+              origin,
+            });
+            const body = sig.slice(2);
+            return [`0x${body.slice(0, 64)}`, `0x${body.slice(64)}`];
+          }
+        })(),
+        paymaster: paymasterRpc,
+      });
+
+      const call = {
+        contractAddress: target,
+        entrypoint:
+          process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",
+        calldata: [],
+      } as any;
+      const paymasterDetails: any = isSponsored
+        ? { feeMode: { mode: "sponsored" as const } }
+        : { feeMode: { mode: "default" as const, gasToken } };
+
+      let maxFee: any = undefined;
+      if (!isSponsored) {
+        const est = await account.estimatePaymasterTransactionFee(
+          [call],
+          paymasterDetails
+        );
+        maxFee = est.suggested_max_fee_in_gas_token;
+      }
+      const result: any = await account.executePaymasterTransaction(
+        [call],
+        paymasterDetails,
+        maxFee
+      );
+      if (wait) {
+        try {
+          await account.waitForTransaction(result.transaction_hash);
+        } catch {}
+      }
+      return res.status(200).json({
+        walletId,
+        address,
+        transactionHash: result?.transaction_hash,
+        result,
+        mode: isSponsored ? "sponsored" : "default",
+      });
+    } else {
+      const { account, address } = await getReadyAccountWithPrivySigner({
+        walletId,
+        publicKey,
+        classHash,
+        userJwt,
+        userId: authUserId,
+        origin,
+      });
+      const result: any = await account.execute({
+        contractAddress: target,
+        entrypoint:
+          process.env.COUNTER_ENTRYPOINT_INCREASE || "increase_counter",
+        calldata: [],
+      } as any);
+      if (wait) {
+        try {
+          await account.waitForTransaction(result.transaction_hash);
+        } catch {}
+      }
+      return res.status(200).json({
+        walletId,
+        address,
+        transactionHash: result?.transaction_hash,
+        result,
+      });
     }
-    return res.status(200).json({
-      walletId,
-      address,
-      transactionHash: result?.transaction_hash,
-      result,
-    });
   } catch (error: any) {
     console.error("Error increasing counter:", error);
     return res

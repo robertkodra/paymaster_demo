@@ -1,14 +1,5 @@
-import {
-  RpcProvider,
-  Account,
-  CallData,
-  CairoOption,
-  CairoOptionVariant,
-  CairoCustomEnum,
-  hash,
-  PaymasterRpc,
-  num,
-} from "starknet";
+import { Account, CallData, CairoOption, CairoOptionVariant, CairoCustomEnum, hash, num } from "starknet";
+import { getRpcProvider, getPaymasterRpc, setupPaymaster } from "./provider";
 import { RawSigner } from "./rawSigner";
 import {
   buildAuthorizationSignature,
@@ -119,47 +110,11 @@ export async function deployReadyWithPrivySigner({
   userId?: string;
   origin?: string;
 }) {
-  const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
-  const isSponsored =
-    (process.env.PAYMASTER_MODE || "sponsored").toLowerCase() === "sponsored";
-  if (isSponsored && !process.env.PAYMASTER_API_KEY) {
-    throw new Error(
-      "PAYMASTER_API_KEY is required when PAYMASTER_MODE is 'sponsored'"
-    );
-  }
+  const provider = getRpcProvider();
+  const { paymasterRpc, isSponsored, gasToken } = await setupPaymaster();
 
   // Initialize Paymaster RPC with proper options structure
-  const paymasterOptions = {
-    nodeUrl: process.env.PAYMASTER_URL || "https://sepolia.paymaster.avnu.fi",
-  };
-
-  // Add headers if API key is provided for sponsored mode
-  if (process.env.PAYMASTER_API_KEY) {
-    paymasterOptions.headers = {
-      "x-paymaster-api-key": process.env.PAYMASTER_API_KEY,
-    };
-  }
-
-  const paymasterRpc = new PaymasterRpc(paymasterOptions);
-
-  // Check if paymaster service is available
-  const isAvailable = await paymasterRpc.isAvailable();
-  if (!isAvailable) {
-    throw new Error("Paymaster service is not available");
-  }
-  console.log("Paymaster service is available");
-
-  // Get supported gas tokens
-  const supportedTokens = await paymasterRpc.getSupportedTokens();
-  console.log("Supported gas tokens:", supportedTokens.length);
-
-  // Select gas token (ETH or USDC based on configuration)
-  const gasToken =
-    process.env.GAS_TOKEN_ADDRESS || supportedTokens[0]?.token_address;
-  if (!gasToken) {
-    throw new Error("No supported gas tokens available");
-  }
-  console.log("Using gas token:", gasToken);
+  // Using paymasterRpc from setupPaymaster; gasToken defined in default mode
 
   const constructorCalldata = buildReadyConstructor(publicKey);
   const contractAddress = hash.calculateContractAddressFromHash(
@@ -272,7 +227,7 @@ export async function getReadyAccountWithPrivySigner({
   userId?: string;
   origin?: string;
 }): Promise<{ account: Account; address: string }> {
-  const provider = new RpcProvider({ nodeUrl: process.env.RPC_URL });
+  const provider = getRpcProvider();
 
   const constructorCalldata = buildReadyConstructor(publicKey);
   const address = hash.calculateContractAddressFromHash(
