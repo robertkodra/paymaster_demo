@@ -2,7 +2,7 @@
 
 Next.js frontend for the Ready Wallet demo. It logs in with Privy, calls the backend to create a Privy wallet and deploy a Ready account using the Privy Wallet API (raw_sign), and includes a simple Counter read/write.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js v18 or higher
@@ -49,16 +49,20 @@ npm start
 
 Client runs on `http://localhost:3001`
 
-## ✨ Features
+## Features
 
-- 🔐 Privy login (embedded wallet)
-- 🧱 Create Privy Starknet wallet and fetch public key
-- 🚀 Deploy Ready account via backend (raw_sign; paymaster optional on server)
-- 🔢 Live counter (polls get_counter(user) every second)
-- 🔴 Big “Increase” button sends a transaction; toast shows tx link
-- 🎨 Minimal UI with Tailwind
+- Privy login (embedded wallet)
+- Create Privy Starknet wallet and fetch public key
+- Deploy Ready account via backend (raw_sign; paymaster optional on server)
+- Live counter (polls get_counter(user) every second)
+- Big “Increase” button sends a transaction; toast shows tx link
+- Minimal UI with Tailwind
 
-## 🎯 Usage
+Notes:
+- The Increase button is disabled until a wallet is deployed (prevents failed txs).
+- Per-user cache: local state (wallet id/address/public key) is cleared on logout and when a different Privy user signs in.
+
+## Usage
 
 1. Open `http://localhost:3001`
 2. Login with Privy
@@ -70,7 +74,7 @@ Notes:
 - Ensure your Privy app has Starknet Tier‑2/Wallet API enabled.
 - If paymaster isn’t configured on the server, deploys and txs require funding the account.
 
-## ⚙️ Configuration
+## Configuration
 
 ### Required Environment Variables
 
@@ -86,7 +90,7 @@ Notes:
 3. Create a new app
 4. Copy the App ID to your `.env.local`
 
-## 🧪 Development
+## Development
 
 ```bash
 # Development server
@@ -102,7 +106,7 @@ npm run lint
 npm run build
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 **Privy authentication not working**
 - Verify `NEXT_PUBLIC_PRIVY_APP_ID` is correct
@@ -118,17 +122,20 @@ npm run build
 - Run `npm run type-check` to identify TypeScript issues
 - Ensure all environment variables are set
 
-## 🛠️ Tech Stack
+**Increase button disabled**
+- Deploy the wallet first. The button enables only when `Deployed`.
+
+## Tech Stack
 
 - Next.js 14
 - Privy React SDK
 - Tailwind CSS
 - TypeScript
 
-## 📱 Authentication Methods
+## Authentication Methods
 
 - Email/Password, Google, Twitter, Discord (configurable in Privy)
 
-## 📄 License
+## License
 
 MIT

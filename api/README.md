@@ -8,7 +8,8 @@ Prerequisites
 - Node.js 18+
 
 Install and run
-```
+
+```bash
 cd api
 npm install
 cp .env.example .env    # or .env.local
@@ -16,7 +17,8 @@ npm run dev             # tsx watch
 ```
 
 Production
-```
+
+```bash
 npm run build
 npm start
 ```
@@ -53,6 +55,26 @@ Paymaster (optional)
 - CONTRACT_ADDRESS – optional contract for initial call
 - CONTRACT_ENTRY_POINT_GET_COUNTER – entrypoint for initial call (default get_counter)
 
+Example .env (minimal)
+
+```env
+PORT=3000
+CLIENT_URL=http://localhost:3001
+RPC_URL=https://starknet-sepolia.public.blastapi.io/rpc/v0_8
+READY_CLASSHASH=0x...
+PRIVY_APP_ID=your_app_id
+PRIVY_APP_SECRET=your_app_secret
+COUNTER_CONTRACT_ADDRESS=0x...
+```
+
+Example .env (paymaster sponsored)
+
+```env
+PAYMASTER_URL=https://sepolia.paymaster.avnu.fi
+PAYMASTER_MODE=sponsored
+PAYMASTER_API_KEY=...
+```
+
 ## Endpoints
 
 Health
@@ -65,7 +87,7 @@ Wallets
 
 Deploy
 - POST /privy/deploy-wallet → body: { walletId } and Authorization: Bearer <user JWT> → deploys Ready account (address derived from public key + class hash)
-   - If paymaster env is configured, deployment uses SNIP‑29 paymaster and executes an initial call with either sponsored or gas‑token mode
+  - If paymaster env is configured, deployment uses SNIP‑29 paymaster and executes an initial call with either sponsored or gas‑token mode
 
 Execute
 - POST /privy/execute → body: { walletId, call|calls, wait? } with Authorization → executes a Starknet call using the Ready account
@@ -74,9 +96,52 @@ Execute
 Read-only helpers
 - GET /privy/counter?contract=…&user=… → calls `get_counter(user)` and returns { hex, decimal }
 
-Notes
-- Fund the computed address with STRK before deployment (unless using a paymaster, not included here).
-- Wallet API calls use Basic (app id/secret) and user authorization signatures; the browser Origin is forwarded.
+## Test with cURL
+
+Create wallet
+
+```bash
+curl -X POST http://localhost:3000/privy/create-wallet \
+  -H 'Content-Type: application/json' \
+  -d '{"ownerId":"<privy_user_id>","chainType":"starknet"}'
+```
+
+Public key
+
+```bash
+curl -X POST http://localhost:3000/privy/public-key \
+  -H 'Content-Type: application/json' \
+  -d '{"walletId":"<wallet_id>"}'
+```
+
+Deploy (requires user JWT)
+
+```bash
+curl -X POST http://localhost:3000/privy/deploy-wallet \
+  -H 'Authorization: Bearer <user_jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{"walletId":"<wallet_id>"}'
+```
+
+Read counter
+
+```bash
+curl "http://localhost:3000/privy/counter?contract=<counter_addr>&user=<ready_addr>"
+```
+
+Increase (requires user JWT)
+
+```bash
+curl -X POST http://localhost:3000/privy/increase-counter \
+  -H 'Authorization: Bearer <user_jwt>' \
+  -H 'Content-Type: application/json' \
+  -d '{"walletId":"<wallet_id>","contractAddress":"<counter_addr>","wait":true}'
+```
+
+## Notes
+
+- Fund the computed address with STRK before deployment unless using a paymaster.
+- Wallet API calls use Basic (app id/secret) + user authorization signatures; the browser Origin is forwarded.
 
 ## Helper Functions (internal)
 

@@ -411,7 +411,16 @@ export default function Home() {
                   <button
                     onClick={increaseCounter}
                     className="arcade-btn"
-                    disabled={!walletId || increasing}
+                    disabled={!walletId || !deployed || increasing}
+                    title={
+                      !walletId
+                        ? "Create a wallet first"
+                        : !deployed
+                        ? "Deploy the wallet first"
+                        : increasing
+                        ? "Submitting…"
+                        : undefined
+                    }
                     aria-label="Increase counter"
                   >
                     {increasing ? "..." : "Increase"}
